@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS `users` (
 --
 
 INSERT INTO `users` (`id`, `ad`, `soyad`, `email`, `sifre`, `created_at`, `dogrulama_kodu`, `aktif`, `rol`) VALUES
-(9, 'Ferat', 'Ucmaz', 'info@deneme.com.tr', '$2y$10$C1fLw4eUz.8om.sW2pdq3edoDC9bC7wPRiQ7NfoT1e8/wy0Tvg0Ny', '2025-06-07 16:37:23', NULL, '0', 'admin');
+(9, 'Ferat', 'Ucmaz', 'info@deneme.com.tr', '$2y$10$28FVFCQNxpCe3vDZ7kb77O/gANmZ.2nN/CRxSeNC1ysN4dqAkWf5C', '2025-06-07 16:37:23', NULL, '1', 'admin');
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
