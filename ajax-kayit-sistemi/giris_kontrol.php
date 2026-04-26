@@ -10,7 +10,7 @@ if (!$email || !$sifre) {
     exit;
 }
 
-$sorgu = $db->prepare("SELECT * FROM users WHERE email = ? AND aktif = 1");
+$sorgu = $db->prepare("SELECT * FROM users WHERE email = ? AND aktif = '1'");
 $sorgu->execute([$email]);
 $kullanici = $sorgu->fetch(PDO::FETCH_ASSOC);
 
