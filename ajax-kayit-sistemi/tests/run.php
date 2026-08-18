@@ -178,7 +178,7 @@ if (!function_exists('curl_init')) {
         1 => ['file', sys_get_temp_dir() . '/ajax_kayit_server.log', 'w'],
         2 => ['file', sys_get_temp_dir() . '/ajax_kayit_server.err', 'w'],
     ];
-    $cmd = sprintf('php -S 127.0.0.1:%d -t %s', $port, escapeshellarg($docRoot));
+    $cmd = ['php', '-S', '127.0.0.1:' . $port, '-t', $docRoot];
     $proc = proc_open($cmd, $descriptors, $pipes, $docRoot, $env);
     if (!is_resource($proc)) {
         assert_true(false, 'PHP built-in server başlatılamadı');
