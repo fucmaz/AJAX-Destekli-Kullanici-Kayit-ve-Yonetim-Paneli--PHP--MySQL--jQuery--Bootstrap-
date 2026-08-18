@@ -108,10 +108,6 @@ function can_update_user(PDO $db, array $actor, array $target, string $newRole, 
         return 'Kendi hesabınızı pasife alamazsınız.';
     }
 
-    if ($actorId === $targetId && $newRole !== 'admin' && $targetIsAdmin && count_admins($db) <= 1) {
-        return 'Son admin hesabının rolü değiştirilemez.';
-    }
-
     if ($targetIsAdmin && $newRole !== 'admin' && count_admins($db) <= 1) {
         return 'Sistemde en az bir admin kalmalıdır.';
     }

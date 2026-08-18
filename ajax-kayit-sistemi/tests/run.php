@@ -150,7 +150,21 @@ if (!function_exists('curl_init')) {
     $ins->execute(['Veli', 'User', 'user@deneme.com.tr', $userHash, 1, 'user']);
     $httpDb = null;
 
-    $port = 18080;
+    $port = 0;
+    for ($tryPort = 18080; $tryPort < 18200; $tryPort++) {
+        $fp = @fsockopen('127.0.0.1', $tryPort, $errno, $errstr, 0.1);
+        if (is_resource($fp)) {
+            fclose($fp);
+            continue;
+        }
+        $port = $tryPort;
+        break;
+    }
+    if ($port === 0) {
+        assert_true(false, 'Boş HTTP portu bulunamadı');
+        echo "\n{$passed} passed, {$failed} failed\n";
+        exit(1);
+    }
     $docRoot = $root;
     $env = getenv();
     if (!is_array($env)) {
@@ -232,6 +246,9 @@ if (!function_exists('curl_init')) {
                 'sifre' => 'StrongPass1',
             ]);
             $regJson = json_decode($register['body'], true);
+            if (($register['status'] ?? 0) !== 200) {
+                echo "  DEBUG kaydet.php status={$register['status']} body={$register['body']}\n";
+            }
             assert_equals(200, $register['status'], 'Kayıt isteği 200 döner');
             assert_equals('success', $regJson['status'] ?? null, 'Kayıt başarılı JSON döner');
 
@@ -294,7 +311,18 @@ if (!function_exists('curl_init')) {
         }
         $status = proc_get_status($proc);
         if (!empty($status['pid'])) {
-            proc_terminate($proc);
+            $pid = (int) $status['pid'];
+            if (function_exists('posix_kill')) {
+                posix_kill($pid, defined('SIGTERM') ? SIGTERM : 15);
+                usleep(200000);
+                if (posix_kill($pid, 0)) {
+                    posix_kill($pid, defined('SIGKILL') ? SIGKILL : 9);
+                }
+            } else {
+                exec('kill ' . $pid);
+                usleep(200000);
+                exec('kill -9 ' . $pid . ' 2>/dev/null');
+            }
         }
         proc_close($proc);
         @unlink($cookie ?? '');
