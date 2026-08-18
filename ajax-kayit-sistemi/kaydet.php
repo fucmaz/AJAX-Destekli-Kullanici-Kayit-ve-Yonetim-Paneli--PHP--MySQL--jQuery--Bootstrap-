@@ -1,99 +1,57 @@
 <?php
-header("Content-Type: application/json");
-require 'db.php';
+declare(strict_types=1);
 
-// PHPMailer dosyalarını dahil et
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
-require 'src/phpmailer/PHPMailer.php';
-require 'src/phpmailer/SMTP.php';
-require 'src/phpmailer/Exception.php';
+require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/includes/mailer.php';
 
-// POST verilerini al
-$ad = trim($_POST['ad'] ?? '');
-$soyad = trim($_POST['soyad'] ?? '');
-$email = trim($_POST['email'] ?? '');
-$sifre = $_POST['sifre'] ?? '';
+require_json_api();
 
-// Basit doğrulama
-if (!$ad || !$soyad || !$email || !$sifre) {
-    echo json_encode(['status' => 'error', 'message' => 'Tüm alanları doldurunuz.']);
-    exit;
+$config = app_config();
+if (rate_limit_is_blocked('register', (int) $config['register_max_attempts'], (int) $config['register_window_seconds'])) {
+    json_response(['status' => 'error', 'message' => 'Çok fazla deneme yaptınız. Lütfen daha sonra tekrar deneyin.'], 429);
 }
-if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    echo json_encode(['status' => 'error', 'message' => 'Geçerli bir e-posta giriniz.']);
-    exit;
+
+$ad = trim((string) ($_POST['ad'] ?? ''));
+$soyad = trim((string) ($_POST['soyad'] ?? ''));
+$email = trim((string) ($_POST['email'] ?? ''));
+$sifre = (string) ($_POST['sifre'] ?? '');
+
+if (!validate_name($ad) || !validate_name($soyad)) {
+    json_response(['status' => 'error', 'message' => 'Ad ve soyad yalnızca harf içermeli ve 50 karakteri geçmemelidir.']);
 }
-$kontrol = $db->prepare("SELECT id FROM users WHERE email = ?");
+if (!validate_email_address($email)) {
+    json_response(['status' => 'error', 'message' => 'Geçerli bir e-posta giriniz.']);
+}
+$passwordError = validate_password($sifre);
+if ($passwordError !== null) {
+    json_response(['status' => 'error', 'message' => $passwordError]);
+}
+
+rate_limit_hit('register', (int) $config['register_window_seconds']);
+
+$db = db();
+
+$kontrol = $db->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
 $kontrol->execute([$email]);
-if ($kontrol->rowCount() > 0) {
-    echo json_encode(['status' => 'error', 'message' => 'Bu e-posta adresi zaten kayıtlı.']);
-    exit;
+if ($kontrol->fetch()) {
+    json_response(['status' => 'error', 'message' => 'Bu e-posta adresi zaten kayıtlı.']);
 }
 
-// Doğrulama kodu ve şifre oluştur
-$dogrulama_kodu = bin2hex(random_bytes(20));
+$dogrulamaKodu = bin2hex(random_bytes(32));
 $hashedPassword = password_hash($sifre, PASSWORD_DEFAULT);
+$expiresAt = (new DateTimeImmutable('now'))->modify('+' . (int) $config['verify_expire_hours'] . ' hours')->format('Y-m-d H:i:s');
 
-// Kullanıcıyı aktif olmayan şekilde kaydet
-$ekle = $db->prepare("INSERT INTO users (ad, soyad, email, sifre, dogrulama_kodu, aktif) VALUES (?, ?, ?, ?, ?, 0)");
-$sonuc = $ekle->execute([$ad, $soyad, $email, $hashedPassword, $dogrulama_kodu]);
-
-if ($sonuc) {
-    $mail = new PHPMailer(true);
-    try {
-        $mail->isSMTP();
-        $mail->Host = 'mail.xxxxx.com.tr'; // kendi SMTP adresin
-        $mail->SMTPAuth = true;
-        $mail->Username = 'info@xxxx.com.tr'; // kendi kullanıcı adın
-        $mail->Password = 'xxxxxx'; // kendi şifren
-        $mail->SMTPSecure = 'tls';
-        $mail->Port = 587;
-
-          // UTF-8 ayarları
-    $mail->CharSet = 'UTF-8';
-    $mail->Encoding = 'base64';
-
-        $mail->SMTPOptions = [
-    'ssl' => [
-        'verify_peer' => false,
-        'verify_peer_name' => false,
-        'allow_self_signed' => true,
-    ],
-];
-
-
-        $mail->setFrom('info@scriptal.com.tr', 'Kayıt Sistemi');
-        $mail->addAddress($email, $ad . ' ' . $soyad);
-        $mail->isHTML(true);
-        $mail->Subject = 'E-posta Doğrulama';
-        $dogrulama_linki = "http://localhost/ajax-kayit-sistemi/dogrula.php?kod=$dogrulama_kodu";
-        $mail->Body = "
-  <div style='font-family: Arial, sans-serif; background: #f9f9f9; padding: 20px; border-radius: 10px; color: #333;'>
-    <div style='background: #0d6efd; color: #fff; padding: 10px 20px; border-radius: 8px 8px 0 0; text-align: center;'>
-      <h2 style='margin: 0;'>Kayıt Onayı</h2>
-    </div>
-    <div style='padding: 20px;'>
-      <p><strong>Merhaba $ad $soyad,</strong></p>
-      <p>Kayıt işleminizi tamamlamak için aşağıdaki bağlantıya tıklayın:</p>
-      <p style='text-align: center; margin: 30px 0;'>
-        <a href='$dogrulama_linki' style='background-color: #198754; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;'>
-          Hesabımı Doğrula
-        </a>
-      </p>
-      <hr>
-      <p style='font-size: 12px; color: #888;'>Bu e-posta size sistem tarafından otomatik olarak gönderilmiştir.</p>
-    </div>
-  </div>
-";
-
-
-        $mail->send();
-
-        echo json_encode(['status' => 'success', 'message' => 'Kayıt başarılı! Lütfen e-postanızı doğrulayın.']);
-    } catch (Exception $e) {
-        echo json_encode(['status' => 'error', 'message' => 'Kayıt yapıldı ama e-posta gönderilemedi.']);
-    }
-} else {
-    echo json_encode(['status' => 'error', 'message' => 'Kayıt yapılamadı.']);
+try {
+    $ekle = $db->prepare('INSERT INTO users (ad, soyad, email, sifre, dogrulama_kodu, dogrulama_expires_at, aktif) VALUES (?, ?, ?, ?, ?, ?, 0)');
+    $ekle->execute([$ad, $soyad, $email, $hashedPassword, $dogrulamaKodu, $expiresAt]);
+} catch (PDOException $e) {
+    error_log('Kayıt hatası: ' . $e->getMessage());
+    json_response(['status' => 'error', 'message' => 'Kayıt yapılamadı.'], 500);
 }
+
+$mailOk = send_verification_email($email, $ad, $soyad, $dogrulamaKodu);
+if ($mailOk) {
+    json_response(['status' => 'success', 'message' => 'Kayıt başarılı! Lütfen e-postanızı doğrulayın.']);
+}
+
+json_response(['status' => 'error', 'message' => 'Kayıt yapıldı ama e-posta gönderilemedi. Yöneticinize başvurun.']);

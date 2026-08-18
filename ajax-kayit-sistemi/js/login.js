@@ -1,10 +1,10 @@
 $(document).ready(function () {
-  $('#kayitFormu').on('submit', function (e) {
+  $('#girisFormu').on('submit', function (e) {
     e.preventDefault();
 
     $.ajax({
       type: 'POST',
-      url: 'kaydet.php',
+      url: 'giris_kontrol.php',
       data: $(this).serialize(),
       dataType: 'json',
       success: function (response) {
@@ -13,10 +13,11 @@ $(document).ready(function () {
             icon: 'success',
             title: 'Başarılı!',
             text: response.message,
-            timer: 2000,
-            showConfirmButton: false
+            showConfirmButton: false,
+            timer: 1500
+          }).then(function () {
+            window.location.href = 'panel.php';
           });
-          $('#kayitFormu')[0].reset();
         } else {
           Swal.fire({
             icon: 'error',
