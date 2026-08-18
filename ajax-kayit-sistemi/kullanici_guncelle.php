@@ -1,28 +1,49 @@
 <?php
-session_start();
-require 'db.php';
+declare(strict_types=1);
 
-if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
-    echo json_encode(['status' => 'error', 'message' => 'Yetkiniz yok.']);
-    exit;
+require_once __DIR__ . '/bootstrap.php';
+require_json_api();
+requireRole(['admin']);
+
+$id = (int) ($_POST['id'] ?? 0);
+$ad = trim((string) ($_POST['ad'] ?? ''));
+$soyad = trim((string) ($_POST['soyad'] ?? ''));
+$aktif = normalize_aktif($_POST['aktif'] ?? '0');
+$rol = (string) ($_POST['rol'] ?? 'user');
+
+if ($id <= 0 || !validate_name($ad) || !validate_name($soyad) || !is_allowed_role($rol)) {
+    json_response(['status' => 'error', 'message' => 'Eksik veya geçersiz bilgi.']);
 }
 
-$id = intval($_POST['id'] ?? 0);
-$ad = trim($_POST['ad'] ?? '');
-$soyad = trim($_POST['soyad'] ?? '');
-$aktif = $_POST['aktif'] === '1' ? 1 : 0;
-$rol = $_POST['rol'] ?? 'user';
+$db = db();
+$sorgu = $db->prepare('SELECT id, rol, aktif FROM users WHERE id = ? LIMIT 1');
+$sorgu->execute([$id]);
+$hedef = $sorgu->fetch();
 
-if (!$id || !$ad || !$soyad || !in_array($rol, ['admin','editor','user'])) {
-    echo json_encode(['status' => 'error', 'message' => 'Eksik veya geçersiz bilgi.']);
-    exit;
+if (!$hedef) {
+    json_response(['status' => 'error', 'message' => 'Kullanıcı bulunamadı.']);
 }
 
-$guncelle = $db->prepare("UPDATE users SET ad = ?, soyad = ?, aktif = ?, rol = ? WHERE id = ?");
+$actor = [
+    'id' => (int) current_user_id(),
+    'rol' => (string) current_user_role(),
+];
+
+$izin = can_update_user($db, $actor, $hedef, $rol, $aktif);
+if ($izin !== true) {
+    json_response(['status' => 'error', 'message' => $izin]);
+}
+
+$guncelle = $db->prepare('UPDATE users SET ad = ?, soyad = ?, aktif = ?, rol = ? WHERE id = ?');
 $sonuc = $guncelle->execute([$ad, $soyad, $aktif, $rol, $id]);
 
-if ($sonuc) {
-    echo json_encode(['status' => 'success', 'message' => 'Kullanıcı bilgileri güncellendi.']);
-} else {
-    echo json_encode(['status' => 'error', 'message' => 'Güncelleme başarısız.']);
+if (!$sonuc) {
+    json_response(['status' => 'error', 'message' => 'Güncelleme başarısız.']);
 }
+
+if ($id === current_user_id()) {
+    $_SESSION['user_name'] = $ad;
+    $_SESSION['user_role'] = $rol;
+}
+
+json_response(['status' => 'success', 'message' => 'Kullanıcı bilgileri güncellendi.']);

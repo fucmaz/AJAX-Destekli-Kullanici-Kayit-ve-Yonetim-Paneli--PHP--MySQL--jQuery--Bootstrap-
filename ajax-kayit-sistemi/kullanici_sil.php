@@ -1,43 +1,39 @@
 <?php
-session_start();
-require 'db.php';
+declare(strict_types=1);
 
-if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
-    echo json_encode(['status' => 'error', 'message' => 'Yetkiniz yok.']);
-    exit;
+require_once __DIR__ . '/bootstrap.php';
+require_json_api();
+requireRole(['admin']);
+
+$id = (int) ($_POST['id'] ?? 0);
+if ($id <= 0) {
+    json_response(['status' => 'error', 'message' => 'Geçersiz kullanıcı ID.']);
 }
 
-$id = intval($_POST['id'] ?? 0);
-if (!$id) {
-    echo json_encode(['status' => 'error', 'message' => 'Geçersiz kullanıcı ID.']);
-    exit;
-}
-
-// Kendisini silmesini engelle
-if ($_SESSION['user_id'] == $id) {
-    echo json_encode(['status' => 'error', 'message' => 'Kendi hesabınızı silemezsiniz.']);
-    exit;
-}
-
-// Silinmek istenen kişinin rolünü al
-$sorgu = $db->prepare("SELECT rol FROM users WHERE id = ?");
+$db = db();
+$sorgu = $db->prepare('SELECT id, rol FROM users WHERE id = ? LIMIT 1');
 $sorgu->execute([$id]);
-$hedef = $sorgu->fetch(PDO::FETCH_ASSOC);
+$hedef = $sorgu->fetch();
 
 if (!$hedef) {
-    echo json_encode(['status' => 'error', 'message' => 'Kullanıcı bulunamadı.']);
-    exit;
+    json_response(['status' => 'error', 'message' => 'Kullanıcı bulunamadı.']);
 }
 
-// Admin silinmesin
-if ($hedef['rol'] === 'admin') {
-    echo json_encode(['status' => 'error', 'message' => 'Admin kullanıcıları silemezsiniz.']);
-    exit;
+$actor = [
+    'id' => (int) current_user_id(),
+    'rol' => (string) current_user_role(),
+];
+
+$izin = can_delete_user($actor, $hedef);
+if ($izin !== true) {
+    json_response(['status' => 'error', 'message' => $izin]);
 }
 
-$sil = $db->prepare("DELETE FROM users WHERE id = ?");
-if ($sil->execute([$id])) {
-    echo json_encode(['status' => 'success', 'message' => 'Kullanıcı başarıyla silindi.']);
-} else {
-    echo json_encode(['status' => 'error', 'message' => 'Kullanıcı silinemedi.']);
+$sil = $db->prepare('DELETE FROM users WHERE id = ? AND rol != ?');
+$sil->execute([$id, 'admin']);
+
+if ($sil->rowCount() !== 1) {
+    json_response(['status' => 'error', 'message' => 'Kullanıcı silinemedi.']);
 }
+
+json_response(['status' => 'success', 'message' => 'Kullanıcı başarıyla silindi.']);

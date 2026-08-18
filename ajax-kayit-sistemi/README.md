@@ -7,8 +7,9 @@ Bu proje, AJAX kullanarak kullanıcı kayıt işlemi yapan, e-posta doğrulamas�
 ## 🇹🇷 Özellikler (Türkçe)
 
 - ✅ AJAX ile kayıt (sayfa yenilemeden)
-- ✅ E-posta doğrulama (PHPMailer ile)
-- ✅ Şifreleme (password_hash)
+- ✅ E-posta doğrulama (PHPMailer ile, süresi dolan bağlantılar)
+- ✅ Şifreleme (`password_hash`) ve oturum yenileme
+- ✅ CSRF, güvenlik başlıkları, giriş/kayıt hız sınırlama
 - ✅ Giriş modülü
 - ✅ Rol bazlı yetkilendirme (admin, editor, user)
 - ✅ Admin paneli:
@@ -23,8 +24,9 @@ Bu proje, AJAX kullanarak kullanıcı kayıt işlemi yapan, e-posta doğrulamas�
 ## 🇬🇧 Features (English)
 
 - ✅ AJAX-based registration (without reload)
-- ✅ Email verification (via PHPMailer)
-- ✅ Secure password hashing
+- ✅ Email verification (via PHPMailer, expiring links)
+- ✅ Secure password hashing and session regeneration
+- ✅ CSRF protection, security headers, login/register rate limits
 - ✅ Login system
 - ✅ Role-based authorization (admin, editor, user)
 - ✅ Admin panel:
@@ -38,17 +40,23 @@ Bu proje, AJAX kullanarak kullanıcı kayıt işlemi yapan, e-posta doğrulamas�
 
 ## 🛠 Kurulum / Setup
 
-1. Veritabanı oluştur: `ajax_kayit`
-2. `sql` klasöründeki SQL dosyasını çalıştır.
-3. `db.php` içindeki bağlantı ayarlarını düzenle.
-4. E-posta gönderimi için PHPMailer ayarlarını `kaydet.php` içinde yap.
-5. Tarayıcıda `index.php` üzerinden kayıt işlemini başlat.
+1. Veritabanı oluşturun: `ajax_kayit`
+2. Yeni kurulumda `sql/tablo.sql` dosyasını çalıştırın. Mevcut kurulum için `sql/guncelle_guvenlik.sql` dosyasını kullanın.
+3. `config.local.example.php` dosyasını `config.local.php` olarak kopyalayıp veritabanı ve SMTP ayarlarını doldurun.
+4. Tarayıcıda `index.php` üzerinden kayıt işlemini başlatın.
+
+```bash
+cp config.local.example.php config.local.php
+```
 
 ---
 
 ## 📁 Klasör Yapısı / Folder Structure
 
+```
 ajax-kayit-sistemi/
+├── bootstrap.php
+├── config.local.example.php
 ├── index.php
 ├── login.php
 ├── panel.php
@@ -58,17 +66,27 @@ ajax-kayit-sistemi/
 ├── kullanici_guncelle.php
 ├── dogrula.php
 ├── kaydet.php
+├── giris_kontrol.php
+├── logout.php
 ├── db.php
 ├── includes/
-│ ├── header.php
-│ └── auth.php
+│   ├── header.php
+│   ├── auth.php
+│   ├── security.php
+│   └── ...
 ├── js/
-│ └── main.js
+│   ├── app.js
+│   ├── main.js
+│   ├── login.js
+│   └── kullanici.js
 ├── sql/
-│ └── tablo.sql
+│   ├── tablo.sql
+│   └── guncelle_guvenlik.sql
 ├── src/
-│ └── PHPMailer (klasörü)
-
+│   └── phpmailer/
+└── tests/
+    └── run.php
+```
 
 ---
 
@@ -80,12 +98,24 @@ ajax-kayit-sistemi/
 | editor  | İçerik ekleyebilir / silebilir                | Can upload/delete content                 |
 | user    | Sadece görebilir ve favorileyebilir          | View and favorite only                    |
 
+Kullanıcı listesi, düzenleme ve silme yalnızca `admin` rolüne açıktır.
+
 ---
 
 ## 🔐 Demo Admin Hesabı / Admin Demo Account
 
 > E-posta: `info@deneme.com.tr`  
-> Şifre: `123456` *(password_hash ile şifrelenmiş)*
+> Şifre: `ChangeMe!123`
+
+Kurulumdan sonra bu şifreyi mutlaka değiştirin.
+
+---
+
+## 🧪 Testler / Tests
+
+```bash
+php tests/run.php
+```
 
 ---
 
@@ -93,6 +123,3 @@ ajax-kayit-sistemi/
 
 MIT Lisansı ile açık kaynak olarak yayınlanmıştır.  
 Free to use under the MIT License.
-
----
-
